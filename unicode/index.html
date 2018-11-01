@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
+    <meta charset="utf-8">
+    <title>Unicode converter</title>
+    <style>
+      textarea {
+        width: 100%;
+        font-family: "Lucida Console", Monaco, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Unicode converter 😄 Edit in any box</p>
+    <table>
+      <tr class="text">
+        <td>Text<br><span></span></td>
+        <td width="99%"><textarea></textarea></td>
+      </tr>
+      <tr class="escaped">
+        <td>Escaped<br><span></span></td>
+        <td><textarea></textarea></td>
+      </tr>
+      <tr class="encoded">
+        <td>Encoded<br><span></span></td>
+        <td><textarea></textarea></td>
+      </tr>
+      <tr class="utf8">
+        <td>UTF-8<br><span></span></td>
+        <td><textarea></textarea></td>
+      </tr>
+      <tr class="utf16">
+        <td>UTF-16<br><span></span></td>
+        <td><textarea></textarea></td>
+      </tr>
+      <tr class="codepoints">
+        <td>CodePts<br><span></span></td>
+        <td><textarea></textarea></td>
+      </tr>
+    </table>
+
+    <script>
+      $(".text textarea").on("input", function() {
+        updateText($(this).val(), this);
+      });
+    
+      $(".escaped textarea").on("input", function() {
+        updateText(unescapeString($(this).val()), this);
+      });
+                    
+      $(".encoded textarea").on("input", function() {
+        updateText(decodeURIComponent($(this).val()), this);
+      });
+            
+      $(".utf16 textarea").on("input", function() {
+        updateText(decodeUtf16(parseHexValues($(this).val())), this);
+      });
+    
+      $(".utf8 textarea").on("input", function() {
+        updateText(decodeUtf8(parseHexValues($(this).val())), this);
+      });
+    
+      $(".codepoints textarea").on("input", function() {
+        updateText(decodeCodePoints(parseHexValues($(this).val())), this);
+      });
+    
+      function updateText(text, el) {
+        $(".text textarea").not(el).val(text);
+        $(".text span").text(text.length);
+        
+        var escaped = escapeString(text);
+        $(".escaped textarea").not(el).val(escapeString(escaped));
+        $(".escaped span").text(escaped.length);
+    
+        var encoded = encodeURIComponent(text);
+        $(".encoded textarea").not(el).val(encoded);  
+        $(".encoded span").text(encoded.length);  
+        
+        var utf16Codes = encodeUtf16(text);
+        $(".utf16 textarea").not(el).val(formatHexValues(utf16Codes, "0x", 4));  
+        $(".utf16 span").text(utf16Codes.length);
+    
+        var utf8Codes = encodeUtf8(text);
+        $(".utf8 textarea").not(el).val(formatHexValues(utf8Codes, "0x", 2));  
+        $(".utf8 span").text(utf8Codes.length);
+        
+        var codePoints = encodeCodePoints(text);
+        $(".codepoints textarea").not(el).val(formatHexValues(codePoints, "U+", 4));  
+        $(".codepoints span").text(codePoints.length);  
+      }
+                    
+      function escapeString(s) {
+        return s.replace(/[^\x20-\x7e]/g, function(c) {  
+          var code = c.charCodeAt(0); 
+          return (code < 0x100) ?
+            "\\x" + ((code + 0x100).toString(16)).slice(-2) :
+            "\\u" + ((code + 0x10000).toString(16)).slice(-4);
+        });
+      }
+    
+      function unescapeString(s) {
+        return s.replace(/\\u([0-9a-f]{4})|\\x([0-9a-f]{2})|\\([0-7]{1,3})/ig, 
+            function(_, unicode, ascii, octal) {
+          return String.fromCharCode(unicode && parseInt(unicode, 16) || 
+              ascii && parseInt(ascii, 16) || parseInt(octal, 8));
+        });
+      }
+    
+      function formatHexValues(a, prefix, minDigits) {
+        var min = minDigits ? (1 << (minDigits * 4)) : 0;
+        return a.map(function(value) {
+          return prefix + ((value >= min) ? value.toString(16) :
+            ((min + value).toString(16)).slice(-minDigits));
+        }).join(' ');  
+      }
+    
+      function parseHexValues(s) {
+        return (s.match(/(0x)?[0-9a-f]{1,5}/ig) || []).map(function(hex) {  
+          return parseInt(hex, 16);
+        });
+      }
+    
+      function encodeUtf16(s) {
+        return s.split('').map(function(c) {
+          return c.charCodeAt(0);
+        });
+      }
+    
+      function decodeUtf16(utf16Codes) {
+        return String.fromCharCode.apply(this, utf16Codes);
+      }
+    
+      function encodeUtf8(s) {
+        return encodeCodePoints(s).reduce(function(a, cp) {
+          var codes;
+          if (cp < 0x80) {
+            codes = [cp];
+          } else if (cp < 0x800) {
+            codes = [(cp >> 6) | 0xc0, (cp & 0x3f) | 0x80];
+          } else if (cp < 0x10000) {
+            codes = [(cp >> 12) | 0xe0, ((cp >> 6) & 0x3f) | 0x80,
+                    (cp & 0x3f) | 0x80];
+          } else {
+            codes = [(cp >> 18) | 0xf0, ((cp >> 12) & 0x3f) | 0x80,
+                ((cp >> 6) & 0x3f) | 0x80, (cp & 0x3f) | 0x80];
+          }
+          return a.concat(codes);
+        }, []);
+      }
+    
+      function decodeUtf8(utf8Codes) {
+        var extra = 0;
+        var codePoints = utf8Codes.reduce(function(a, code) {
+          if (code < 0x80) {
+            a.push(code);
+            extra = 0;
+          } else if (code >= 0x80 && code < 0xc0) {
+            if (extra) {
+              extra--;
+              var i = a.length - 1;
+              a[i] = a[i] << 6 | (code & 0x3f); 
+            }
+          } else if (code >= 0xc0 && code < 0xe0) {
+            a.push(code & 0x1f);
+            extra = 1;
+          } else if (code >= 0xe0 && code < 0xef) {
+            a.push(code & 0xf);
+            extra = 2;
+          } else if (code >= 0xf0 && code < 0xf8) {
+            a.push(code & 0x7);
+            extra = 3;
+          }
+          return a;
+        }, []);
+        return decodeCodePoints(codePoints);
+      }
+    
+      function encodeCodePoints(s) {
+        var matches = s.match(/[\ud800-\udbff][\udc00-\udfff]|[^]/g);
+        return (matches || []).map(function(c) {  
+          return c.length == 1 ? c.charCodeAt(0) :
+              ((c.charCodeAt(0) & 0x3ff) << 10) + 
+              (c.charCodeAt(1) & 0x3ff) + 0x10000;
+        });   
+      }
+        
+      function decodeCodePoints(codePoints) {
+        return codePoints.map(function(codePoint) {
+          return decodeUtf16((codePoint < 0x10000) ? [codePoint] : [
+            0xd800 + (((codePoint - 0x10000) >> 10) & 0x3ff),
+            0xdc00 + (codePoint & 0x3ff)
+          ]);
+        }).join('');
+      }
+    </script>    
+  </body>
+</html>
