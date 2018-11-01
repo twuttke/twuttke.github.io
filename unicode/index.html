@@ -90,12 +90,16 @@
         $(".codepoints span").text(codePoints.length);  
       }
                     
+      function numToHex(num) {
+        return num.toString(16).toUpperCase();
+      }
+
       function escapeString(s) {
         return s.replace(/[^\x20-\x7e]/g, function(c) {  
           var code = c.charCodeAt(0); 
           return (code < 0x100) ?
-            "\\x" + ((code + 0x100).toString(16)).slice(-2) :
-            "\\u" + ((code + 0x10000).toString(16)).slice(-4);
+            "\\x" + numToHex(code + 0x100).slice(-2) :
+            "\\u" + numToHex(code + 0x10000).slice(-4);
         });
       }
     
@@ -110,8 +114,8 @@
       function formatHexValues(a, prefix, minDigits) {
         var min = minDigits ? (1 << (minDigits * 4)) : 0;
         return a.map(function(value) {
-          return prefix + ((value >= min) ? value.toString(16) :
-            ((min + value).toString(16)).slice(-minDigits));
+          return prefix + ((value >= min) ? numToHex(value) :
+              numToHex(min + value).slice(-minDigits));
         }).join(' ');  
       }
     
